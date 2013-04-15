@@ -10,7 +10,6 @@ import sqlite3
 
 testList = []
 testNames = []
-#orgList = []
 sourceDir = ""
 destDir = ""
 orgName = ""
@@ -58,6 +57,7 @@ def copyTest(testList):
 	for x in testList:
         	shutil.copy2(sourceDir + x, getFullDestDir(destDir))
 
+#checks if an org exists, if so return the needed variables
 def checkOrgExists(orgName):
         conn = sqlite3.connect('orgs.db')
         c = conn.cursor()
@@ -74,6 +74,7 @@ def checkOrgExists(orgName):
 		print orgName + " doesnt exist"
 		sys.exit(2)
 
+#Remove the org from the db
 def clean(orgName):
 	# Call checkOrgExists and add needed values to variables
 	orgDict = checkOrgExists(orgName)
@@ -91,10 +92,11 @@ def clean(orgName):
 	else:
 		print cleanOrg + "does not exist"	
 
-
+#todo, needs to output build.xml and package.xml
 def buildXML(testList):
 	print 'bla'
 
+#adds the org to the DB
 def db(orgName, sourceDir, destDir):
 	#Create insert string
 	orgList = (orgName, sourceDir, destDir)
@@ -115,6 +117,7 @@ def db(orgName, sourceDir, destDir):
 	conn.commit()
 	conn.close()
 
+#lists orgs, messy output, needs cleaning
 def listOrgs():
 	conn = sqlite3.connect('orgs.db')
 	c = conn.cursor()
@@ -130,7 +133,6 @@ if __name__ == '__main__':
 	destDir = args.d
 	orgName = args.n
 	cleanOrg = args.c	
-#select correct path
 	if args.s and args.n and args.d and args.db:
 		db(orgName, sourceDir, destDir)
 		makeDir(destDir)
@@ -152,7 +154,6 @@ if __name__ == '__main__':
 		makeDir(destDir)
                 searchTest(testList)
                 copyTest(testList)
-		#you need to find the org and then execute everything
 	elif args.x:
 		buildXML(testList)
 
