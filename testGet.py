@@ -82,9 +82,8 @@ def checkOrgExists(orgName):
 #Remove the org from the db
 def clean(orgName):
 	# Call checkOrgExists and add needed values to variables
-	orgDict = checkOrgExists(orgName)
-	cleanOrg = orgDict['orgName']
-	destDir = orgDict['destDir']
+	cleanOrg = checkOrgExists(orgName)['orgName']
+	destDir = checkOrgExists(orgName)['destDir']
 	# If dictionary comes back not blank execute a delete
 	if len(orgDict) != 0:
 	        conn = sqlite3.connect('orgs.db')
@@ -98,19 +97,19 @@ def clean(orgName):
 		print cleanOrg + "does not exist"	
 
 #todo, needs to output build.xml and package.xml
-def buildXML(testList):
+def buildXML(testNames):
 	#etree.register_namespace('sf', "antlib:com.salesforce")
 	buildNS = "antlib:com.salesforce"
 	buildNsmap = {"sf": buildNS}
 	build = etree.Element("project", name ="Sample usage of Salesforce Ant tasks", default="test", basedir=".", nsmap=buildNsmap)
 	target = etree.SubElement(build, "target", name="runTests")
 	deploy = etree.SubElement(target, "{antlib:com.salesforce}deploy", username="bla", password="bla", serverurl="bla", deployRoot=".", maxPoll="7000", pollWaitMillis="8000", runAllTests="false", checkOnly="true")
-	#for x in testList:
-	test = etree.SubElement(target, "runTest") 	
-
-
+	for x in testNames:
+		test = etree.SubElement(deploy, "runTest")
+		test.text = x
 
 	print etree.tostring(build, pretty_print=True)
+
 #adds the org to the DB
 def db(orgName, sourceDir, destDir, uName, pWord):
 	#Create insert string
@@ -179,10 +178,6 @@ if __name__ == '__main__':
 		org = checkOrgExists(orgName)
 		sourceDir = org['sourceDir']
 		testNames = searchTest(sourceDir)['testNames']
-		#tests = searchTest(sourceDir)
-		#names = tests['testNames']
-		#test = searchTest['testNames']
-		print testNames 
 		buildXML(testNames)
 
 
