@@ -3,7 +3,6 @@ import glob
 import os
 import sys
 import getopt
-#import xml.etree.ElementTree as ET
 from lxml import etree
 import shutil
 import argparse
@@ -14,6 +13,8 @@ testNames = []
 sourceDir = ""
 destDir = ""
 orgName = ""
+uName = ""
+pWord = ""
 fullDestDir = ""
 productionURL = "https://login.salesforce.com"
 sandboxURL = "https://test.salesforce.com"
@@ -31,7 +32,7 @@ parser.add_argument("-db", help ="Add settings to db", action="store_true")
 parser.add_argument("-l", help="List orgs", action="store_true")
 parser.add_argument("-u", help="Username")
 parser.add_argument("-p", help="Password")
-parser.add_argument("-ip", help="Is production?. Boolean", action="store_true")
+parser.add_argument("-ip", help="Use production URL", action="store_true")
 
 #Create the needed directory
 def makeDir(destDir):
@@ -48,7 +49,6 @@ def getFullDestDir(destDir):
 	return fullDestDir
 
 #Search for testMethod string in classes
-#def searchTest(testList):
 def searchTest(sourcedir):
 	os.chdir(sourceDir)
 	for files in glob.glob("*.*"):
@@ -66,7 +66,7 @@ def copyTest(testList):
         	shutil.copy2(sourceDir + x, getFullDestDir(destDir))
 
 #checks if an org exists, if so return the needed variables
-def checkOrgExists(orgName):
+def getOrgInfo(orgName):
         conn = sqlite3.connect('orgs.db')
         c = conn.cursor()
         #find the org details
@@ -84,9 +84,9 @@ def checkOrgExists(orgName):
 
 #Remove the org from the db
 def clean(orgName):
-	# Call checkOrgExists and add needed values to variables
-	cleanOrg = checkOrgExists(orgName)['orgName']
-	destDir = checkOrgExists(orgName)['destDir']
+	# Call getOrgInfo and add needed values to variables
+	cleanOrg = getOrgInfo(orgName)['orgName']
+	destDir = getOrgInfo(orgName)['destDir']
 	# If dictionary comes back not blank execute a delete
 	if len(cleanOrg) != 0:
 	        conn = sqlite3.connect('orgs.db')
@@ -100,20 +100,16 @@ def clean(orgName):
 		print cleanOrg + "does not exist"	
 
 #todo, needs to output build.xml and package.xml
-def buildXML(testNames, destDir, orgName, isProd):
-	#get org details
-	#uName = checkOrgExists(orgName)['uName']
-	#pWord = checkOrgExists(orgName)['pWord']
-	#create build.xml
+def buildXML(testNames, destDir, orgName, isProd, uName, pWord):
 	buildNS = "antlib:com.salesforce"
 	buildNsmap = {"sf": buildNS}
 	build = etree.Element("project", name="Test Runner", default="test", basedir=".", nsmap=buildNsmap)
 	target = etree.SubElement(build, "target", name="runTests")
 
 	if isProd:
-		deploy = etree.SubElement(target, "{antlib:com.salesforce}deploy", username="bla", password="bla", serverurl=productionURL, deployRoot=".", maxPoll="7000", pollWaitMillis="8000", runAllTests="false", checkOnly="true")
-	elif isProd == False:
-		deploy = etree.SubElement(target, "{antlib:com.salesforce}deploy", username="bla", password="bla", serverurl=sandboxURL, deployRoot=".", maxPoll="7000", pollWaitMillis="8000", runAllTests="false", checkOnly="true")
+		deploy = etree.SubElement(target, "{antlib:com.salesforce}deploy", username=uName, password=pWord, serverurl=productionURL, deployRoot=".", maxPoll="7000", pollWaitMillis="8000", runAllTests="false", checkOnly="true")
+	elif not isProd:
+		deploy = etree.SubElement(target, "{antlib:com.salesforce}deploy", username=uName, password=pWord, serverurl=sandboxURL, deployRoot=".", maxPoll="7000", pollWaitMillis="8000", runAllTests="false", checkOnly="true")
 	else:
 		print "Bad value"
 
@@ -166,7 +162,7 @@ def db(orgName, sourceDir, destDir, uName, pWord):
 	conn.commit()
 	conn.close()
 
-#lists orgs, messy output, needs cleaning
+#list orgs
 def listOrgs():
 	conn = sqlite3.connect('orgs.db')
 	c = conn.cursor()
@@ -189,45 +185,35 @@ if __name__ == '__main__':
 	pWord = args.p
 	if args.s and args.n and args.d and args.db and args.u and args.p:
 		db(orgName, sourceDir, destDir, uName, pWord)
-		#makeDir(destDir)
-		#searchTest(sourceDir)
-		#copyTest(testList)
 	elif args.c:
 		clean(cleanOrg)
-	#elif args.s and args.n and args.d and not args.db:
-        #        makeDir(destDir)
-        #        searchTest(sourceDir)
-        #        copyTest(testList)
 	elif args.l:
 		listOrgs()
 	elif args.n:
 		if args.ip:
-			sourceDir = checkOrgExists(orgName)['sourceDir']
-                	destDir = checkOrgExists(orgName)['destDir']
-                	testNames = searchTest(sourceDir)['testNames']
+			sourceDir = getOrgInfo(orgName)['sourceDir']
+                	destDir = getOrgInfo(orgName)['destDir']
+			uName = getOrgInfo(orgName)['uName']
+                	pWord = getOrgInfo(orgName)['pWord']
+			testNames = searchTest(sourceDir)['testNames']
 			isProd = True
                 	makeDir(destDir)
                 	searchTest(sourceDir)
                 	copyTest(testList)
-                	buildXML(testNames, destDir, orgName, isProd)
+                	buildXML(testNames, destDir, orgName, isProd, uName, pWord)
 		else:
-
-			sourceDir = checkOrgExists(orgName)['sourceDir']
-			destDir = checkOrgExists(orgName)['destDir']
+			sourceDir = getOrgInfo(orgName)['sourceDir']
+			destDir = getOrgInfo(orgName)['destDir']
+                        uName = getOrgInfo(orgName)['uName']
+                        pWord = getOrgInfo(orgName)['pWord']
 			testNames = searchTest(sourceDir)['testNames']
 			isProd = False
 			makeDir(destDir)
                 	searchTest(sourceDir)
                 	copyTest(testList)
-			buildXML(testNames, destDir, orgName, isProd)
-	#elif args.x and args.n:
-	#	org = checkOrgExists(orgName)
-	#	sourceDir = org['sourceDir']
-	#	destDir = org['destDir']
-	#	orgName = org['orgName']	
-	#	testNames = searchTest(sourceDir)['testNames']
-	#	buildXML(testNames, destDir, orgName)
-
+			buildXML(testNames, destDir, orgName, isProd, uName, pWord)
+	else:
+		print "Incorrect choice"
 
 
 
