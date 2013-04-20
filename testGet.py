@@ -15,6 +15,8 @@ sourceDir = ""
 destDir = ""
 orgName = ""
 fullDestDir = ""
+productionURL = "https://login.salesforce.com"
+sandboxURL = "https://test.salesforce.com"
 
 #collect options and validate they are correct
 
@@ -29,6 +31,7 @@ parser.add_argument("-db", help ="Add settings to db", action="store_true")
 parser.add_argument("-l", help="List orgs", action="store_true")
 parser.add_argument("-u", help="Username")
 parser.add_argument("-p", help="Password")
+parser.add_argument("-ip", help="Is production?. Boolean", action="store_true")
 
 #Create the needed directory
 def makeDir(destDir):
@@ -73,7 +76,7 @@ def checkOrgExists(orgName):
 	if len(existingOrg) != 0:
 		for row in existingOrg:
 			orgName, sourceDir, destDir, uName, pWord = row
-		return {'orgName':orgName, 'sourceDir':sourceDir, 'destDir':destDir, 'uName':uName, 'pWord':pWord } 
+		return {'orgName':orgName, 'sourceDir':sourceDir, 'destDir':destDir, 'uName':uName, 'pWord':pWord} 
 	# If it doesnt exist tell the user and exit
 	else:
 		print orgName + " doesnt exist"
@@ -85,7 +88,7 @@ def clean(orgName):
 	cleanOrg = checkOrgExists(orgName)['orgName']
 	destDir = checkOrgExists(orgName)['destDir']
 	# If dictionary comes back not blank execute a delete
-	if len(orgDict) != 0:
+	if len(cleanOrg) != 0:
 	        conn = sqlite3.connect('orgs.db')
 	        c = conn.cursor()
                 c.execute("DELETE FROM main where orgName = ?", (cleanOrg,))
@@ -97,18 +100,50 @@ def clean(orgName):
 		print cleanOrg + "does not exist"	
 
 #todo, needs to output build.xml and package.xml
-def buildXML(testNames):
-	#etree.register_namespace('sf', "antlib:com.salesforce")
+def buildXML(testNames, destDir, orgName, isProd):
+	#get org details
+	#uName = checkOrgExists(orgName)['uName']
+	#pWord = checkOrgExists(orgName)['pWord']
+	#create build.xml
 	buildNS = "antlib:com.salesforce"
 	buildNsmap = {"sf": buildNS}
-	build = etree.Element("project", name ="Sample usage of Salesforce Ant tasks", default="test", basedir=".", nsmap=buildNsmap)
+	build = etree.Element("project", name="Test Runner", default="test", basedir=".", nsmap=buildNsmap)
 	target = etree.SubElement(build, "target", name="runTests")
-	deploy = etree.SubElement(target, "{antlib:com.salesforce}deploy", username="bla", password="bla", serverurl="bla", deployRoot=".", maxPoll="7000", pollWaitMillis="8000", runAllTests="false", checkOnly="true")
+
+	if isProd:
+		deploy = etree.SubElement(target, "{antlib:com.salesforce}deploy", username="bla", password="bla", serverurl=productionURL, deployRoot=".", maxPoll="7000", pollWaitMillis="8000", runAllTests="false", checkOnly="true")
+	elif isProd == False:
+		deploy = etree.SubElement(target, "{antlib:com.salesforce}deploy", username="bla", password="bla", serverurl=sandboxURL, deployRoot=".", maxPoll="7000", pollWaitMillis="8000", runAllTests="false", checkOnly="true")
+	else:
+		print "Bad value"
+
 	for x in testNames:
 		test = etree.SubElement(deploy, "runTest")
 		test.text = x
 
-	print etree.tostring(build, pretty_print=True)
+	buildXML = etree.ElementTree(build)
+	filepath = destDir + orgName + "/" #+ "build.xml"
+	buildXML.write(filepath + "build.xml", pretty_print=True, xml_declaration=True)
+
+	#create package.xml
+	packageNS = "http://soap.sforce.com/2006/04/metadata"
+	packageNsmap = { None : packageNS}
+	package = etree.Element("Package", nsmap=packageNsmap)
+
+	types = etree.SubElement(package, "types")
+
+	for y in testNames:
+		members = etree.SubElement(types, "members")
+		members.text = y
+
+	name = etree.SubElement(types, "name")
+	name.text = "ApexClass"
+	version = etree.SubElement(package, "version")
+	version.text = "27.0"
+	
+	packageXML = etree.ElementTree(package)
+	packageXML.write(filepath + "package.xml", pretty_print=True, xml_declaration=True)
+
 
 #adds the org to the DB
 def db(orgName, sourceDir, destDir, uName, pWord):
@@ -151,34 +186,47 @@ if __name__ == '__main__':
 	orgName = args.n
 	cleanOrg = args.c
 	uName = args.u
-	pWord = args.p	
+	pWord = args.p
 	if args.s and args.n and args.d and args.db and args.u and args.p:
 		db(orgName, sourceDir, destDir, uName, pWord)
-		makeDir(destDir)
-		searchTest(testList)
-		copyTest(testList)
+		#makeDir(destDir)
+		#searchTest(sourceDir)
+		#copyTest(testList)
 	elif args.c:
 		clean(cleanOrg)
-	elif args.s and args.n and args.d and not args.db:
-                makeDir(destDir)
-                searchTest(testList)
-                copyTest(testList)
+	#elif args.s and args.n and args.d and not args.db:
+        #        makeDir(destDir)
+        #        searchTest(sourceDir)
+        #        copyTest(testList)
 	elif args.l:
 		listOrgs()
-	elif args.n and not args.x:
-		sourceDir = checkOrgExists(orgName)['sourceDir']
-		destDir = checkOrgExists(orgName)['destDir']
-		#destDir = org['destDir']
-		#sourceDir = org['sourceDir']	
-               	print sourceDir + destDir 
-		makeDir(destDir)
-                searchTest(testList)
-                copyTest(testList)
-	elif args.x and args.n:
-		org = checkOrgExists(orgName)
-		sourceDir = org['sourceDir']
-		testNames = searchTest(sourceDir)['testNames']
-		buildXML(testNames)
+	elif args.n:
+		if args.ip:
+			sourceDir = checkOrgExists(orgName)['sourceDir']
+                	destDir = checkOrgExists(orgName)['destDir']
+                	testNames = searchTest(sourceDir)['testNames']
+			isProd = True
+                	makeDir(destDir)
+                	searchTest(sourceDir)
+                	copyTest(testList)
+                	buildXML(testNames, destDir, orgName, isProd)
+		else:
+
+			sourceDir = checkOrgExists(orgName)['sourceDir']
+			destDir = checkOrgExists(orgName)['destDir']
+			testNames = searchTest(sourceDir)['testNames']
+			isProd = False
+			makeDir(destDir)
+                	searchTest(sourceDir)
+                	copyTest(testList)
+			buildXML(testNames, destDir, orgName, isProd)
+	#elif args.x and args.n:
+	#	org = checkOrgExists(orgName)
+	#	sourceDir = org['sourceDir']
+	#	destDir = org['destDir']
+	#	orgName = org['orgName']	
+	#	testNames = searchTest(sourceDir)['testNames']
+	#	buildXML(testNames, destDir, orgName)
 
 
 
