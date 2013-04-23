@@ -36,6 +36,11 @@ parser.add_argument("-ip", help="Use production URL", action="store_true")
 
 #Create the needed directory
 def makeDir(destDir):
+	#clean out existing dirs
+	try:
+		shutil.rmtree(destDir + orgName + "/classes")
+	except:
+		pass
 	try:
 		os.makedirs(destDir + orgName + "/classes")
 	except OSError:
@@ -54,7 +59,7 @@ def searchTest(sourcedir):
 	for files in glob.glob("*.*"):
 		f=open(files, 'r')
 		s=f.read()
-		if 'testMethod' in s:
+		if 'testmethod' in s.lower():
 			testList.append(f.name)
 			testList.append(f.name + "-meta.xml")
 			testNames.append(os.path.splitext(f.name)[0])
@@ -101,6 +106,7 @@ def clean(orgName):
 
 #todo, needs to output build.xml and package.xml
 def buildXML(testNames, destDir, orgName, isProd, uName, pWord):
+	#Create build.xml
 	buildNS = "antlib:com.salesforce"
 	buildNsmap = {"sf": buildNS}
 	build = etree.Element("project", name="Test Runner", default="test", basedir=".", nsmap=buildNsmap)
